@@ -123,7 +123,7 @@ body{background:var(--bg);color:var(--t);font-family:-apple-system,BlinkMacSyste
 .act{background:var(--s2);border:1px solid rgba(255,255,255,.07);color:var(--t2);padding:8px 14px;border-radius:12px;font-size:12px;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;transition:background .15s}
 .act:hover{background:var(--s3)}
 .act svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.2}
-#dz{margin:2px 16px 10px;border:1.5px dashed rgba(255,255,255,.12);border-radius:16px;padding:18px;text-align:center;color:var(--t3);font-size:13px;cursor:pointer;transition:border-color .2s,background .2s;flex-shrink:0;line-height:2}
+#dz{display:block;margin:2px 16px 10px;border:1.5px dashed rgba(255,255,255,.12);border-radius:16px;padding:18px;text-align:center;color:var(--t3);font-size:13px;cursor:pointer;transition:border-color .2s,background .2s;flex-shrink:0;line-height:2}
 #dz.drag{border-color:var(--a);background:rgba(124,92,252,.07)}
 #dz svg{width:26px;height:26px;stroke:var(--t3);fill:none;stroke-width:1.4;display:block;margin:0 auto 8px;opacity:.5}
 #tlist{flex:1}
@@ -385,18 +385,18 @@ body.light{--bg:#f0f0f8;--s1:#fff;--s2:#f4f4fb;--s3:#eaeaf5;--s4:#dcdcee;--t:#14
 <div id="sl" class="scr">
   <div class="lhd"><h2>ライブラリ</h2><span class="spill" id="lcnt">0曲</span><span class="spill" id="ldur">0:00</span></div>
   <div class="acts">
-    <button class="act" onclick="document.getElementById('fi').click()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7-7 7 7"/></svg>曲を追加</button>
-    <button class="act" onclick="document.getElementById('foi').click()"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>フォルダ</button>
+    <label class="act" for="fi"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7-7 7 7"/></svg>曲を追加</label>
+    <label class="act" for="foi"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>フォルダ</label>
     <button class="act" onclick="cycleSort()"><svg viewBox="0 0 24 24"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/></svg>並び替え</button>
   </div>
-  <div id="dz" ondrop="onDrop(event)" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" onclick="document.getElementById('fi').click()">
+  <label id="dz" for="fi" ondrop="onDrop(event)" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')">
     <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     ドラッグ＆ドロップ または <strong style="color:var(--t2)">タップして追加</strong><br>
     <small style="opacity:.6">MP3・AAC・WAV・FLAC など対応 — <strong style="color:var(--a2)">曲はブラウザに保存されます</strong></small>
-  </div>
+  </label>
   <div id="tlist"><div id="emptylib"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><strong>ライブラリが空です</strong>上から音楽ファイルを追加してください</div></div>
-  <input type="file" id="fi" accept="audio/*" multiple onchange="addFiles(this.files);this.value=''">
-  <input type="file" id="foi" accept="audio/*" multiple webkitdirectory onchange="addFiles(this.files);this.value=''">
+  <input type="file" id="fi" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.webm,.weba,.mp4,.aiff,.aif,audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/flac,audio/ogg,audio/opus,audio/webm,audio/x-aiff" multiple onchange="addFiles(this.files);this.value=''">
+  <input type="file" id="foi" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.webm,.weba,.mp4,.aiff,.aif,audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/flac,audio/ogg,audio/opus,audio/webm,audio/x-aiff" multiple webkitdirectory onchange="addFiles(this.files);this.value=''">
 </div>
 
 <!-- ═══ PLAYLISTS ═══ -->
@@ -511,8 +511,8 @@ body.light{--bg:#f0f0f8;--s1:#fff;--s2:#f4f4fb;--s3:#eaeaf5;--s4:#dcdcee;--t:#14
   <div class="tf"><label>アーティスト</label><input class="ti2" id="tgart"></div>
   <div class="tf"><label>アルバム</label><input class="ti2" id="tgalb"></div>
   <div class="tf"><label>ジャンル</label><input class="ti2" id="tggen"></div>
-  <button class="jch" onclick="document.getElementById('jfi').click()">🖼 ジャケット画像を変更</button>
-  <input type="file" id="jfi" accept="image/*" onchange="changeJkt(this)">
+  <label class="jch" for="jfi">🖼 ジャケット画像を変更</label>
+  <input type="file" id="jfi" accept="image/*,image/jpeg,image/png,image/gif,image/webp" onchange="changeJkt(this)">
   <div class="mbtns"><button class="mcanc" onclick="closeTag()">キャンセル</button><button class="mok" onclick="saveTag()">保存</button></div></div>
 </div>
 <!-- ─── SLEEP ─── -->
@@ -661,10 +661,15 @@ function saveCfg(){cfg.vol=+document.getElementById('volinp').value;saveMetaToDB
 function initWA(){
   if(actx)return;
   try{
-    actx=new(window.AudioContext||window.webkitAudioContext)();
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    actx=new AC();
+    // iOS Safari: context starts suspended, resume on first gesture
+    if(actx.state==='suspended')actx.resume();
     srcN=actx.createMediaElementSource(aud);
     gainN=actx.createGain(); gainN.gain.value=cfg.vol/100;
-    panN=actx.createStereoPanner?actx.createStereoPanner():null;
+    // iOS 12以下は createStereoPanner 非対応
+    try{panN=actx.createStereoPanner?actx.createStereoPanner():null;}catch(e){panN=null;}
     anlN=actx.createAnalyser(); anlN.fftSize=64;
     bassN=actx.createBiquadFilter(); bassN.type='lowshelf'; bassN.frequency.value=200;
     let ch=srcN;
@@ -673,8 +678,12 @@ function initWA(){
     if(panN){bassN.connect(panN);panN.connect(gainN);}else bassN.connect(gainN);
     gainN.connect(anlN);anlN.connect(actx.destination);
     waveLoop();
-  }catch(e){actx=null;}
+  }catch(e){console.warn('WebAudio init failed:',e);actx=null;}
 }
+
+// iOS Safari: AudioContext を必ずユーザー操作から resume させる
+document.addEventListener('touchstart',()=>{if(actx&&actx.state==='suspended')actx.resume();},{once:false,passive:true});
+document.addEventListener('touchend',()=>{if(actx&&actx.state==='suspended')actx.resume();},{once:false,passive:true});
 
 // ═══ WAVEFORM ═══
 function buildWave(){
@@ -689,23 +698,64 @@ function waveLoop(){
 }
 
 // ═══ ADD FILES ═══
+// iOS対応: FileReader で ArrayBuffer を取得するフォールバック
+function fileToArrayBuffer(file){
+  // file.arrayBuffer() は iOS 15以下で不安定なため FileReader を優先
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=e=>res(e.target.result);
+    r.onerror=e=>rej(e.target.error);
+    r.readAsArrayBuffer(file);
+  });
+}
+
+// iOS Safari では audio/* だとファイルアプリの音楽がグレーアウトされる。
+// そのため拡張子・MIMEタイプで判定し、不明なファイルも試行する。
+function isLikelyAudio(file){
+  if(file.type&&file.type.startsWith('audio/'))return true;
+  if(!file.type||file.type==='application/octet-stream'||file.type===''){
+    return /\.(mp3|m4a|aac|ogg|flac|wav|opus|webm|weba|aiff|aif|mp4)$/i.test(file.name);
+  }
+  // m4a はブラウザによって video/mp4 で来ることがある
+  if(file.type==='video/mp4'&&/\.(m4a|mp4)$/i.test(file.name))return true;
+  return false;
+}
+
+function guessMime(file){
+  if(file.type&&file.type!=='application/octet-stream'&&file.type!=='')return file.type;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const map={mp3:'audio/mpeg',m4a:'audio/mp4',aac:'audio/aac',ogg:'audio/ogg',flac:'audio/flac',wav:'audio/wav',opus:'audio/opus',webm:'audio/webm',weba:'audio/webm',aiff:'audio/x-aiff',aif:'audio/x-aiff',mp4:'audio/mp4'};
+  return map[ext]||'audio/mpeg';
+}
+
 async function addFiles(files){
   if(!files?.length)return;
   showLoad(true);
-  const arr=Array.from(files).filter(f=>f.type.startsWith('audio/')||/\.(mp3|m4a|aac|ogg|flac|wav|opus|webm|weba)$/i.test(f.name));
-  if(!arr.length){showLoad(false);toast('対応する音楽ファイルが見つかりません');return;}
+  // iOS: type が空やoctet-streamで来る場合も含めて受け入れる
+  const arr=Array.from(files).filter(f=>isLikelyAudio(f));
+  if(!arr.length){
+    showLoad(false);
+    toast('音楽ファイルが見つかりません。拡張子を確認してください');
+    return;
+  }
   let added=0,dupes=0,failed=0;
   for(const file of arr){
     if(lib.find(t=>t.name===file.name&&t.size===file.size)){dupes++;continue;}
     const id='T'+Date.now()+Math.random().toString(36).slice(2,6);
     try{
-      const ab=await file.arrayBuffer();
+      const ab=await fileToArrayBuffer(file); // FileReader ベースで安定
       await saveFileToDB(id,ab);
-      const t={id,name:file.name,size:file.size,mime:file.type||'audio/mpeg',title:file.name.replace(/\.[^.]+$/,''),artist:'不明なアーティスト',album:'不明なアルバム',genre:'',cover:null,dur:0,addedAt:Date.now(),plays:0,lastPlayed:null,loved:false,lyrics:'',lastPos:0};
-      // duration
-      try{const bu=URL.createObjectURL(file);t.dur=await getDur(bu);URL.revokeObjectURL(bu);}catch(e){}
+      const mime=guessMime(file);
+      const t={id,name:file.name,size:file.size,mime,title:file.name.replace(/\.[^.]+$/,''),artist:'不明なアーティスト',album:'不明なアルバム',genre:'',cover:null,dur:0,addedAt:Date.now(),plays:0,lastPlayed:null,loved:false,lyrics:'',lastPos:0};
+      // duration取得 (失敗しても続行)
+      try{
+        const blob=new Blob([ab],{type:mime});
+        const bu=URL.createObjectURL(blob);
+        t.dur=await getDur(bu);
+        URL.revokeObjectURL(bu);
+      }catch(e){}
       lib.push(t); added++;
-    }catch(e){failed++;console.error(e);}
+    }catch(e){failed++;console.error('addFiles error:',file.name,e);}
   }
   showLoad(false);
   if(dupes)toast(dupes+'曲はすでに追加済み');
@@ -718,32 +768,57 @@ function onDrop(e){e.preventDefault();document.getElementById('dz').classList.re
 // ═══ PLAY ═══
 async function playTrack(idx,keepQ=false){
   if(idx<0||idx>=lib.length)return;
+  // WebAudio は再生ボタン押下（ユーザー操作）から初期化
   if(!actx)initWA();
   if(actx?.state==='suspended')actx.resume();
   curIdx=idx; const t=lib[idx];
   const url=await getAudioURL(t);
   if(!url){toast('⚠ ファイルが見つかりません（再追加してください）');return;}
-  aud.pause(); aud.src=url;
-  aud.playbackRate=SPEEDS[speedIdx];
+  aud.pause();
+  aud.src=''; // iOS: srcをリセットしてから再設定
+  aud.load();
+  aud.src=url;
   aud.volume=cfg.vol/100;
   if(gainN)gainN.gain.value=cfg.vol/100;
+  // playbackRate は load後でないと iOS で無視されることがある
+  aud.playbackRate=SPEEDS[speedIdx];
   if(t.lastPos>5&&t.lastPos<(t.dur||Infinity)-5)aud.currentTime=t.lastPos;
   try{
-    await aud.play();
+    // iOS Safari: play() は必ずユーザー操作の同期コンテキストから呼ぶ必要がある
+    // ここは async だが UI タップから呼ばれるので基本OK
+    const playPromise=aud.play();
+    if(playPromise!==undefined)await playPromise;
     t.plays=(t.plays||0)+1; t.lastPlayed=Date.now();
     hist.unshift(idx); if(hist.length>200)hist=hist.slice(0,200);
     syncNP(t); syncMini(t); renderLib(); renderPLs(); renderStats();
     if(!keepQ)buildQ();
     await saveMetaToDB();
     goTab('sp');
-  }catch(err){toast('再生エラー: '+(err.message||err));}
+  }catch(err){
+    console.error('playTrack error:',err);
+    // iOS: NotAllowedError はユーザー操作コンテキスト外。再度タップを促す
+    if(err.name==='NotAllowedError'){
+      toast('▶ 再度再生ボタンをタップしてください');
+    } else {
+      toast('再生エラー: '+(err.message||err));
+    }
+  }
 }
 function togPlay(){
   if(!lib.length){goTab('sl');return;}
   if(curIdx<0){playTrack(0);return;}
   if(!actx)initWA();
   if(actx?.state==='suspended')actx.resume();
-  isPlay?aud.pause():aud.play().catch(e=>toast('再生エラー: '+e.message));
+  if(isPlay){
+    aud.pause();
+  } else {
+    // iOS: play() を直接呼ぶ（async にしない）
+    const p=aud.play();
+    if(p&&p.catch)p.catch(e=>{
+      if(e.name==='NotAllowedError')toast('▶ もう一度タップしてください');
+      else toast('再生エラー: '+e.message);
+    });
+  }
 }
 function prevTrk(){if(aud.currentTime>3){aud.currentTime=0;return;}playTrack(shuffOn?rndIdx():Math.max(0,curIdx-1));}
 function nextTrk(){
