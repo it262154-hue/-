@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MusicFlow">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<!-- iOS バックグラウンド再生: メディアコンテンツとして認識させる -->
+<meta name="media-content" content="audio">
 <title>MusicFlow</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -549,8 +552,12 @@ let sortMode='added', filtMode='all', editIdx=-1;
 let sleepEnd=0, sleepTid=null;
 let queue=[], qPos=0, speedIdx=0;
 const SPEEDS=[1,1.25,1.5,1.75,2,0.5,0.75];
-const aud=new Audio();
-aud.preload='none';
+const aud = new Audio();
+// iOS バックグラウンド再生に必要な属性
+aud.preload = 'auto';           // iOS: none/metadata だと BG で止まりやすい
+aud.setAttribute('playsinline', '');           // iOS インライン再生
+aud.setAttribute('webkit-playsinline', '');    // iOS 旧バージョン対応
+aud.setAttribute('x-webkit-airplay', 'allow'); // AirPlay 対応
 
 // WebAudio
 let actx,srcN,gainN,panN,anlN,eqNs=[],bassN;
@@ -597,15 +604,47 @@ async function loadFromDB(){
   if(cRec) Object.assign(cfg,cRec.value||{});
 }
 
-// Blobキャッシュ (セッション中のみ)
-const blobCache={};
-async function getAudioURL(t){
-  if(blobCache[t.id]) return blobCache[t.id];
-  const ab=await getFileFromDB(t.id);
-  if(!ab) return null;
-  const blob=new Blob([ab],{type:t.mime||'audio/mpeg'});
-  const url=URL.createObjectURL(blob);
-  blobCache[t.id]=url;
+// ── iOS バックグラウンド再生対応 ──────────────────────────────
+// iOS Safari は blob: URL をバックグラウンドで停止する。
+// 対策: ArrayBuffer → base64 data URI に変換してキャッシュ。
+// data URI は iOS バックグラウンドでも再生が継続される。
+const urlCache = {}; // id -> data URI (メモリキャッシュ)
+
+function ab2dataURL(ab, mime) {
+  // ArrayBuffer → Uint8Array → binary string → base64
+  const bytes = new Uint8Array(ab);
+  let bin = '';
+  // チャンク処理（スタックオーバーフロー防止）
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return 'data:' + (mime || 'audio/mpeg') + ';base64,' + btoa(bin);
+}
+
+async function getAudioURL(t) {
+  // キャッシュがあればそのまま返す
+  if (urlCache[t.id]) return urlCache[t.id];
+
+  const ab = await getFileFromDB(t.id);
+  if (!ab) return null;
+
+  const mime = t.mime || 'audio/mpeg';
+
+  // ファイルサイズで方式を選択
+  // 小さいファイル(<= 30MB): data URI（iOS バックグラウンド安定）
+  // 大きいファイル(> 30MB) : blob URL（メモリ節約。バックグラウンドは△）
+  const MB30 = 30 * 1024 * 1024;
+  let url;
+  if (ab.byteLength <= MB30) {
+    url = ab2dataURL(ab, mime);
+  } else {
+    // 大きいファイルは blob URL を使うが、iOS BG は止まる可能性あり
+    const blob = new Blob([ab], { type: mime });
+    url = URL.createObjectURL(blob);
+  }
+
+  urlCache[t.id] = url;
   return url;
 }
 
@@ -661,27 +700,49 @@ function applyCfg(){
 function saveCfg(){cfg.vol=+document.getElementById('volinp').value;saveMetaToDB();}
 
 // ═══ WEBAUDIO ═══
+// iOS か否かを判定
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 function initWA(){
-  if(actx)return;
+  if(actx) return;
   try{
-    const AC=window.AudioContext||window.webkitAudioContext;
-    if(!AC)return;
-    actx=new AC();
-    // iOS Safari: context starts suspended, resume on first gesture
-    if(actx.state==='suspended')actx.resume();
-    srcN=actx.createMediaElementSource(aud);
-    gainN=actx.createGain(); gainN.gain.value=cfg.vol/100;
-    // iOS 12以下は createStereoPanner 非対応
-    try{panN=actx.createStereoPanner?actx.createStereoPanner():null;}catch(e){panN=null;}
-    anlN=actx.createAnalyser(); anlN.fftSize=64;
-    bassN=actx.createBiquadFilter(); bassN.type='lowshelf'; bassN.frequency.value=200;
-    let ch=srcN;
-    eqNs=EQF.map((f,i)=>{const n=actx.createBiquadFilter();n.type=i===0?'lowshelf':i===EQF.length-1?'highshelf':'peaking';n.frequency.value=f;ch.connect(n);ch=n;return n;});
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    actx = new AC();
+    if(actx.state === 'suspended') actx.resume();
+
+    // iOS: createMediaElementSource は BG で音が止まる原因になることがある
+    // → iOS では WebAudio チェーンを作らず、HTMLAudioElement 直接制御にする
+    // (EQ・波形は非対応になるが BG 再生の安定性を優先)
+    if (isIOS) {
+      // iOS: WebAudio なしで動作。音量は aud.volume で直接制御
+      anlN = actx.createAnalyser(); anlN.fftSize = 64;
+      // MediaElementSource なしなので analyser への接続はできないが
+      // ダミーとして用意（波形はランダムアニメにフォールバック）
+      anlN.connect(actx.destination);
+      console.log('MusicFlow: iOS mode - WebAudio chain skipped for BG stability');
+      // EQ スライダーは表示するが音には反映されない（UIのみ）
+      return;
+    }
+
+    // Android / PC: フル WebAudio チェーン
+    srcN  = actx.createMediaElementSource(aud);
+    gainN = actx.createGain(); gainN.gain.value = cfg.vol/100;
+    try{ panN = actx.createStereoPanner ? actx.createStereoPanner() : null; }catch(e){ panN=null; }
+    anlN  = actx.createAnalyser(); anlN.fftSize = 64;
+    bassN = actx.createBiquadFilter(); bassN.type = 'lowshelf'; bassN.frequency.value = 200;
+    let ch = srcN;
+    eqNs = EQF.map((f,i)=>{
+      const n = actx.createBiquadFilter();
+      n.type = i===0 ? 'lowshelf' : i===EQF.length-1 ? 'highshelf' : 'peaking';
+      n.frequency.value = f; ch.connect(n); ch = n; return n;
+    });
     ch.connect(bassN);
-    if(panN){bassN.connect(panN);panN.connect(gainN);}else bassN.connect(gainN);
-    gainN.connect(anlN);anlN.connect(actx.destination);
+    if(panN){ bassN.connect(panN); panN.connect(gainN); } else bassN.connect(gainN);
+    gainN.connect(anlN); anlN.connect(actx.destination);
     waveLoop();
-  }catch(e){console.warn('WebAudio init failed:',e);actx=null;}
+  }catch(e){ console.warn('WebAudio init failed:',e); actx=null; }
 }
 
 // iOS Safari: AudioContext を必ずユーザー操作から resume させる
@@ -778,13 +839,19 @@ async function playTrack(idx,keepQ=false){
   const url=await getAudioURL(t);
   if(!url){toast('⚠ ファイルが見つかりません（再追加してください）');return;}
   aud.pause();
-  aud.src=''; // iOS: srcをリセットしてから再設定
-  aud.load();
-  aud.src=url;
-  aud.volume=cfg.vol/100;
-  if(gainN)gainN.gain.value=cfg.vol/100;
-  // playbackRate は load後でないと iOS で無視されることがある
-  aud.playbackRate=SPEEDS[speedIdx];
+  // data URI の場合は src を直接セット（load()不要、iOS BGに強い）
+  // blob URL の場合は一度リセットして load() を呼ぶ
+  if (url.startsWith('data:')) {
+    aud.src = url;
+  } else {
+    aud.src = '';
+    aud.load();
+    aud.src = url;
+  }
+  aud.volume = cfg.vol/100;
+  if(gainN) gainN.gain.value = cfg.vol/100;
+  // iOS: gainN なし → aud.volume のみで制御
+  aud.playbackRate = SPEEDS[speedIdx];
   if(t.lastPos>5&&t.lastPos<(t.dur||Infinity)-5)aud.currentTime=t.lastPos;
   try{
     // iOS Safari: play() は必ずユーザー操作の同期コンテキストから呼ぶ必要がある
@@ -954,7 +1021,11 @@ function addToQ2(idx){queue.splice(qPos+1,0,idx);toast('キューに追加しま
 async function removeTrk(idx){
   if(idx===curIdx){aud.pause();curIdx=-1;}else if(idx<curIdx)curIdx--;
   const t=lib.splice(idx,1)[0];
-  if(blobCache[t.id]){URL.revokeObjectURL(blobCache[t.id]);delete blobCache[t.id];}
+  // キャッシュ解放（blob URLの場合のみ revoke、data URI はそのまま delete）
+  if(urlCache[t.id]){
+    if(urlCache[t.id].startsWith('blob:')) URL.revokeObjectURL(urlCache[t.id]);
+    delete urlCache[t.id];
+  }
   await delFileFromDB(t.id);
   await saveMetaToDB();renderLib();renderStats();calcDBSize();toast('削除しました');
 }
@@ -1058,7 +1129,10 @@ function togBG(cb){cfg.bg=cb.checked;if(!cfg.bg)document.getElementById('bgart')
 function setTheme(c1,c2,el){const r=document.documentElement.style;r.setProperty('--a',c1);r.setProperty('--a2',c2);r.setProperty('--ag',`linear-gradient(135deg,${c1},${c2})`);document.querySelectorAll('.tc').forEach(e=>e.classList.remove('on'));el.classList.add('on');cfg.accent=c1;cfg.accent2=c2;saveCfg();}
 async function clearAll(){
   if(!confirm('ライブラリをすべて削除しますか？\nIndexedDBの音楽データもすべて消えます。'))return;
-  aud.pause();aud.src='';Object.values(blobCache).forEach(u=>URL.revokeObjectURL(u));
+  aud.pause();aud.src='';
+  // urlCache のうち blob: URL だけ revoke してメモリ解放
+  Object.entries(urlCache).forEach(([k,u])=>{if(u.startsWith('blob:'))URL.revokeObjectURL(u);});
+  Object.keys(urlCache).forEach(k=>delete urlCache[k]);
   lib=[];playlists=[];hist=[];curIdx=-1;
   await idbClear(STORE_FILES);await idbClear(STORE_META);
   renderLib();renderPLs();renderStats();calcDBSize();
@@ -1093,24 +1167,16 @@ function setupMS() {
   if (!('mediaSession' in navigator)) return;
   const ms = navigator.mediaSession;
 
-  ms.setActionHandler('play',         () => { if (!isPlay) togPlay(); });
-  ms.setActionHandler('pause',        () => { if (isPlay)  togPlay(); });
-  ms.setActionHandler('previoustrack',() => prevTrk());
-  ms.setActionHandler('nexttrack',    () => nextTrk());
-  ms.setActionHandler('seekto', e => {
-    if (e.seekTime !== undefined && aud.duration) {
-      aud.currentTime = e.seekTime;
-    }
-  });
-  ms.setActionHandler('seekbackward', e => {
-    aud.currentTime = Math.max(0, aud.currentTime - (e.seekOffset || 10));
-  });
-  ms.setActionHandler('seekforward', e => {
-    aud.currentTime = Math.min(aud.duration || 0, aud.currentTime + (e.seekOffset || 10));
-  });
-
-  // 停止ボタン（一部端末）
-  try { ms.setActionHandler('stop', () => { aud.pause(); aud.currentTime = 0; }); } catch(e) {}
+  // ── アクションハンドラ登録 ──
+  const safe = (action, fn) => { try { ms.setActionHandler(action, fn); } catch(e) {} };
+  safe('play',          () => { if (!isPlay) togPlay(); });
+  safe('pause',         () => { if (isPlay)  togPlay(); });
+  safe('stop',          () => { aud.pause(); aud.currentTime = 0; });
+  safe('previoustrack', () => prevTrk());
+  safe('nexttrack',     () => nextTrk());
+  safe('seekto',        e  => { if (e.seekTime != null && aud.duration) aud.currentTime = e.seekTime; });
+  safe('seekbackward',  e  => { aud.currentTime = Math.max(0, aud.currentTime - (e.seekOffset || 10)); });
+  safe('seekforward',   e  => { aud.currentTime = Math.min(aud.duration || 0, aud.currentTime + (e.seekOffset || 10)); });
 }
 
 function updateMS() {
@@ -1119,30 +1185,37 @@ function updateMS() {
   const t = lib[curIdx];
   if (!t) return;
 
-  ms.playbackState = isPlay ? 'playing' : 'paused';
+  // 再生状態
+  try { ms.playbackState = isPlay ? 'playing' : 'paused'; } catch(e) {}
 
-  // ロック画面に曲情報・ジャケットを表示
-  const meta = {
-    title:  t.title  || '不明なタイトル',
-    artist: t.artist || '不明なアーティスト',
-    album:  t.album  || '',
-  };
-  // ジャケット画像があればロック画面にも表示
-  if (t.cover) {
-    meta.artwork = [
-      { src: t.cover, sizes: '512x512', type: 'image/jpeg' },
-      { src: t.cover, sizes: '256x256', type: 'image/jpeg' },
-    ];
-  }
-  try { ms.metadata = new MediaMetadata(meta); } catch(e) {}
+  // ロック画面の曲情報
+  // iOS Safari: cover は既に base64 data URI なのでそのまま渡せる
+  // blob: URL は BG で無効になるが data: URI は有効のまま
+  try {
+    const artwork = [];
+    if (t.cover) {
+      // iOS は PNG/JPEG どちらでも受け付ける
+      // サイズを複数指定するとOSが適切なものを選ぶ
+      const mtype = t.cover.includes('image/png') ? 'image/png' : 'image/jpeg';
+      artwork.push({ src: t.cover, sizes: '512x512', type: mtype });
+      artwork.push({ src: t.cover, sizes: '256x256', type: mtype });
+      artwork.push({ src: t.cover, sizes: '96x96',   type: mtype });
+    }
+    ms.metadata = new MediaMetadata({
+      title:   t.title  || '不明なタイトル',
+      artist:  t.artist || '不明なアーティスト',
+      album:   t.album  || '',
+      artwork,
+    });
+  } catch(e) {}
 
-  // シークバーの位置情報をOSに通知（iOS 16+ / Chrome 対応）
-  if (aud.duration && ms.setPositionState) {
+  // シークバー位置（iOS 16+ / Chrome）
+  if (aud.duration && isFinite(aud.duration) && ms.setPositionState) {
     try {
       ms.setPositionState({
         duration:     aud.duration,
         playbackRate: aud.playbackRate || 1,
-        position:     Math.min(aud.currentTime, aud.duration),
+        position:     Math.min(Math.max(0, aud.currentTime), aud.duration),
       });
     } catch(e) {}
   }
@@ -1161,14 +1234,26 @@ function tickMS() {
 function setupVis() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-      // バックグラウンドに入っても audio は止めない
-      // iOS Safari: audio 要素は visibility に関係なく再生を継続する
-      // （WebAudio の ScriptProcessor などを使っている場合は止まることがあるが
-      //   今回は HTMLAudioElement 直接再生なので問題なし）
+      // ── バックグラウンド突入 ──
+      // iOS Safari: HTMLAudioElement は基本継続するが、
+      // WebAudio (gainNode) が suspended になることがある
+      // → gainNode の音量を直接 audio.volume で保持し続ける
+      if (actx && actx.state === 'suspended') {
+        // WebAudio が止まっても HTMLAudioElement 自体は継続
+        // audio.volume を直接セットして音が出るようにする
+        aud.volume = cfg.vol / 100;
+      }
     } else {
-      // フォアグラウンドに戻ったら AudioContext を確認
+      // ── フォアグラウンド復帰 ──
       if (actx && actx.state === 'suspended') actx.resume();
-      syncPB();
+      // iOS: バックグラウンド中に pause されていた場合、
+      // isPlay フラグと実際の再生状態がズレることがある
+      const actuallyPlaying = !aud.paused;
+      if (isPlay !== actuallyPlaying) {
+        isPlay = actuallyPlaying;
+        syncPB();
+      }
+      updateMS();
     }
   });
 
@@ -1176,9 +1261,24 @@ function setupVis() {
   window.addEventListener('pageshow', e => {
     if (e.persisted) {
       if (actx && actx.state === 'suspended') actx.resume();
-      syncPB(); syncJK();
+      syncPB(); syncJK(); updateMS();
     }
   });
+
+  // iOS Safari 特有：audio が突然止まった時に検知して再開を試みる
+  // (バックグラウンド時のOS強制停止への対応)
+  let _bgCheck = null;
+  aud.addEventListener('play', () => {
+    clearInterval(_bgCheck);
+    _bgCheck = setInterval(() => {
+      // フォアグラウンドなのに止まっていたら再開
+      if (document.visibilityState === 'visible' && isPlay && aud.paused && aud.src) {
+        aud.play().catch(() => {});
+      }
+    }, 3000);
+  });
+  aud.addEventListener('pause', () => clearInterval(_bgCheck));
+  aud.addEventListener('ended', () => clearInterval(_bgCheck));
 }
 
 // ── 3. Screen Wake Lock ──────────────────
