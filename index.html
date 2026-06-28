@@ -632,12 +632,15 @@ async function boot(){
   setupSeek(); setupVol(); setupKeys();
   aud.addEventListener('timeupdate',onTime);
   aud.addEventListener('ended',onEnded);
-  aud.addEventListener('play',()=>{isPlay=true;syncPB();syncJK();});
-  aud.addEventListener('pause',()=>{isPlay=false;syncPB();syncJK();});
+  aud.addEventListener('play',()=>{isPlay=true;syncPB();syncJK();updateMS();});
+  aud.addEventListener('pause',()=>{isPlay=false;syncPB();syncJK();updateMS();});
   aud.addEventListener('error',()=>{const c={1:'ABORTED',2:'NETWORK',3:'DECODE',4:'NOT_SUPPORTED'};toast('再生エラー: '+(aud.error?c[aud.error.code]||aud.error.code:'?'));});
-  aud.addEventListener('loadedmetadata',()=>{if(lib[curIdx])lib[curIdx].dur=aud.duration;});
+  aud.addEventListener('loadedmetadata',()=>{if(lib[curIdx])lib[curIdx].dur=aud.duration;updateMS();});
   setInterval(()=>{if(sleepEnd)tickSleep();},1000);
   setInterval(()=>saveMetaToDB(),20000);
+  setupMS();
+  setupVis();
+  setupWL();
   calcDBSize();
   showLoad(false);
 }
@@ -791,6 +794,7 @@ async function playTrack(idx,keepQ=false){
     t.plays=(t.plays||0)+1; t.lastPlayed=Date.now();
     hist.unshift(idx); if(hist.length>200)hist=hist.slice(0,200);
     syncNP(t); syncMini(t); renderLib(); renderPLs(); renderStats();
+    updateMS(); // ロック画面・通知センターの曲情報を更新
     if(!keepQ)buildQ();
     await saveMetaToDB();
     goTab('sp');
@@ -852,6 +856,7 @@ function onTime(){
   document.getElementById('mfill').style.width=(p*100)+'%';
   if(lib[curIdx])lib[curIdx].lastPos=aud.currentTime;
   syncLyrHL();
+  tickMS(); // ロック画面のシークバー位置を更新
 }
 function toggleMute(){aud.muted=!aud.muted;syncVolIc();}
 function syncVolIc(){const v=aud.muted?0:cfg.vol;document.getElementById('volic').textContent=v===0?'🔇':v<40?'🔈':v<70?'🔉':'🔊';}
@@ -1078,6 +1083,134 @@ function goTab(id){
 }
 
 // ═══ KEYS ═══
+// ═══════════════════════════════════════════
+// BACKGROUND PLAYBACK SUPPORT
+// ═══════════════════════════════════════════
+
+// ── 1. Media Session API ──────────────────
+// ロック画面・通知センター・イヤホンボタンでの操作を可能にする
+function setupMS() {
+  if (!('mediaSession' in navigator)) return;
+  const ms = navigator.mediaSession;
+
+  ms.setActionHandler('play',         () => { if (!isPlay) togPlay(); });
+  ms.setActionHandler('pause',        () => { if (isPlay)  togPlay(); });
+  ms.setActionHandler('previoustrack',() => prevTrk());
+  ms.setActionHandler('nexttrack',    () => nextTrk());
+  ms.setActionHandler('seekto', e => {
+    if (e.seekTime !== undefined && aud.duration) {
+      aud.currentTime = e.seekTime;
+    }
+  });
+  ms.setActionHandler('seekbackward', e => {
+    aud.currentTime = Math.max(0, aud.currentTime - (e.seekOffset || 10));
+  });
+  ms.setActionHandler('seekforward', e => {
+    aud.currentTime = Math.min(aud.duration || 0, aud.currentTime + (e.seekOffset || 10));
+  });
+
+  // 停止ボタン（一部端末）
+  try { ms.setActionHandler('stop', () => { aud.pause(); aud.currentTime = 0; }); } catch(e) {}
+}
+
+function updateMS() {
+  if (!('mediaSession' in navigator)) return;
+  const ms = navigator.mediaSession;
+  const t = lib[curIdx];
+  if (!t) return;
+
+  ms.playbackState = isPlay ? 'playing' : 'paused';
+
+  // ロック画面に曲情報・ジャケットを表示
+  const meta = {
+    title:  t.title  || '不明なタイトル',
+    artist: t.artist || '不明なアーティスト',
+    album:  t.album  || '',
+  };
+  // ジャケット画像があればロック画面にも表示
+  if (t.cover) {
+    meta.artwork = [
+      { src: t.cover, sizes: '512x512', type: 'image/jpeg' },
+      { src: t.cover, sizes: '256x256', type: 'image/jpeg' },
+    ];
+  }
+  try { ms.metadata = new MediaMetadata(meta); } catch(e) {}
+
+  // シークバーの位置情報をOSに通知（iOS 16+ / Chrome 対応）
+  if (aud.duration && ms.setPositionState) {
+    try {
+      ms.setPositionState({
+        duration:     aud.duration,
+        playbackRate: aud.playbackRate || 1,
+        position:     Math.min(aud.currentTime, aud.duration),
+      });
+    } catch(e) {}
+  }
+}
+
+// timeupdate のたびにシークバー位置を更新（4秒に1回で十分）
+let _msPosTick = 0;
+function tickMS() {
+  _msPosTick++;
+  if (_msPosTick % 4 !== 0) return; // ~4秒ごと
+  updateMS();
+}
+
+// ── 2. Visibility API ────────────────────
+// タブ/アプリが非表示になっても再生を止めない
+function setupVis() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      // バックグラウンドに入っても audio は止めない
+      // iOS Safari: audio 要素は visibility に関係なく再生を継続する
+      // （WebAudio の ScriptProcessor などを使っている場合は止まることがあるが
+      //   今回は HTMLAudioElement 直接再生なので問題なし）
+    } else {
+      // フォアグラウンドに戻ったら AudioContext を確認
+      if (actx && actx.state === 'suspended') actx.resume();
+      syncPB();
+    }
+  });
+
+  // iOS Safari: ページが BFCache から復元された場合の対応
+  window.addEventListener('pageshow', e => {
+    if (e.persisted) {
+      if (actx && actx.state === 'suspended') actx.resume();
+      syncPB(); syncJK();
+    }
+  });
+}
+
+// ── 3. Screen Wake Lock ──────────────────
+// 再生中に画面が暗くなるのを防ぐ（対応ブラウザのみ）
+let _wakeLock = null;
+
+async function setupWL() {
+  if (!('wakeLock' in navigator)) return; // 非対応ブラウザはスキップ
+
+  async function acquireWL() {
+    if (!isPlay) return;
+    try {
+      if (_wakeLock) return; // すでに取得済み
+      _wakeLock = await navigator.wakeLock.request('screen');
+      _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+    } catch(e) { /* 省電力モード中などで失敗することがある */ }
+  }
+
+  async function releaseWL() {
+    if (_wakeLock) { await _wakeLock.release(); _wakeLock = null; }
+  }
+
+  aud.addEventListener('play',  () => acquireWL());
+  aud.addEventListener('pause', () => releaseWL());
+  aud.addEventListener('ended', () => releaseWL());
+
+  // visibilitychange で再取得（バックグラウンドから戻ったとき）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && isPlay) acquireWL();
+  });
+}
+
 function setupKeys(){
   document.addEventListener('keydown',e=>{
     if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
