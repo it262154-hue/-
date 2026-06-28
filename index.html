@@ -1310,7 +1310,17 @@ async function setupWL() {
     if (document.visibilityState === 'visible' && isPlay) acquireWL();
   });
 }
-de==='KeyP')prevTrk();
+
+function setupKeys(){
+  document.addEventListener('keydown',e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+    if(e.code==='Space'){e.preventDefault();togPlay();}
+    else if(e.code==='ArrowRight')aud.currentTime=Math.min(aud.duration||0,aud.currentTime+5);
+    else if(e.code==='ArrowLeft')aud.currentTime=Math.max(0,aud.currentTime-5);
+    else if(e.code==='ArrowUp'){const sl=document.getElementById('volinp');sl.value=Math.min(100,cfg.vol+5);sl.dispatchEvent(new Event('input'));}
+    else if(e.code==='ArrowDown'){const sl=document.getElementById('volinp');sl.value=Math.max(0,cfg.vol-5);sl.dispatchEvent(new Event('input'));}
+    else if(e.code==='KeyN')nextTrk();
+    else if(e.code==='KeyP')prevTrk();
     else if(e.code==='KeyM')toggleMute();
     else if(e.code==='KeyS')togShuf();
     else if(e.code==='KeyF')favNow();
@@ -1321,3 +1331,16 @@ de==='KeyP')prevTrk();
 function restoreLast(){if(lib.length){renderLib();// pre-warm first track info
 if(curIdx>=0&&lib[curIdx])syncNP(lib[curIdx]);}}
 
+// ═══ UTILS ═══
+function fmt(s){if(!s||isNaN(s)||!isFinite(s))return'0:00';return`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),2800);}
+function showLoad(on){const b=document.getElementById('lbar');if(on){b.style.width='0%';b.style.opacity='1';setTimeout(()=>b.style.width='55%',30);}else{b.style.width='100%';setTimeout(()=>{b.style.opacity='0';b.style.width='0%';},350);}}
+
+document.addEventListener('click',()=>closeCtx());
+
+// ═══ START ═══
+boot();
+</script>
+</body>
+</html>
