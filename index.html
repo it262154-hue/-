@@ -311,9 +311,161 @@ textarea.ti2{min-height:130px;resize:none;line-height:1.7}
 #dbstatus.on{opacity:1}
 
 body.light{--bg:#f0f0f8;--s1:#fff;--s2:#f4f4fb;--s3:#eaeaf5;--s4:#dcdcee;--t:#14142a;--t2:#4a4a6a;--t3:#8888aa}
+body.light .lin-inp{background:#eaeaf5;border-color:rgba(0,0,0,.1);color:#14142a}
+body.light #login-card{background:#fff;border-color:rgba(0,0,0,.08)}
+body.light #tut-box{background:#fff}
+
+/* ── LOGIN SCREEN ── */
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#login-screen.hide{display:none}
+#login-logo{font-size:32px;font-weight:900;background:var(--ag);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-1px;margin-bottom:4px}
+#login-sub{font-size:11px;color:var(--t3);margin-bottom:36px;letter-spacing:.3px}
+#login-card{background:var(--s1);border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:28px 24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px}
+.lin-lbl{font-size:10px;font-weight:800;color:var(--t3);letter-spacing:.7px;text-transform:uppercase;margin-bottom:4px}
+.lin-inp{background:var(--s3);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:13px 14px;font-size:15px;color:var(--t);outline:none;width:100%;font-family:inherit;transition:border-color .2s}
+.lin-inp:focus{border-color:rgba(124,92,252,.5)}
+#login-err{font-size:12px;color:var(--red);text-align:center;min-height:16px;font-weight:600}
+#login-btn{background:var(--ag);border:none;color:#fff;padding:15px;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.3px;box-shadow:0 6px 20px rgba(124,92,252,.4);transition:transform .1s}
+#login-btn:active{transform:scale(.97)}
+#login-hint{font-size:11px;color:var(--t3);text-align:center;line-height:1.7}
+#login-hint strong{color:var(--a2)}
+#ver-badge{position:absolute;bottom:20px;right:20px;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:.3px;opacity:.6}
+
+/* ── TUTORIAL OVERLAY ── */
+#tut{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1500;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px)}
+#tut.on{display:flex}
+#tut-box{background:var(--s1);border-radius:24px;width:100%;max-width:380px;overflow:hidden;border:1px solid rgba(255,255,255,.1)}
+#tut-header{background:var(--ag);padding:24px 20px 20px;text-align:center}
+#tut-header h2{font-size:20px;font-weight:800;color:#fff;margin-bottom:4px}
+#tut-header p{font-size:12px;color:rgba(255,255,255,.75)}
+#tut-slides{overflow:hidden;position:relative}
+.tut-slide{padding:22px 22px 16px;display:none;animation:slideIn .3s ease}
+.tut-slide.on{display:block}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+.tut-icon{font-size:36px;text-align:center;margin-bottom:10px}
+.tut-slide h3{font-size:16px;font-weight:800;margin-bottom:8px;letter-spacing:-.2px}
+.tut-slide p{font-size:13px;color:var(--t2);line-height:1.7}
+.tut-slide ul{list-style:none;margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.tut-slide ul li{font-size:12px;color:var(--t2);display:flex;align-items:flex-start;gap:8px}
+.tut-slide ul li::before{content:'•';color:var(--a2);font-weight:900;flex-shrink:0}
+#tut-dots{display:flex;justify-content:center;gap:6px;padding:12px 0 4px}
+.tut-dot{width:6px;height:6px;border-radius:50%;background:var(--s4);transition:background .2s,transform .2s}
+.tut-dot.on{background:var(--a2);transform:scale(1.3)}
+#tut-footer{display:flex;gap:8px;padding:12px 20px 20px}
+#tut-prev{flex:1;padding:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);color:var(--t2);border-radius:12px;font-size:13px;cursor:pointer;font-weight:700}
+#tut-next{flex:2;padding:12px;background:var(--ag);border:none;color:#fff;border-radius:12px;font-size:13px;cursor:pointer;font-weight:800;box-shadow:0 4px 14px rgba(124,92,252,.35)}
+
+/* ── SEEK 大型化 ── */
+#seek{width:100%;margin-bottom:4px}
+#sk-wrap{position:relative;height:36px;display:flex;align-items:center;cursor:pointer}
+#sk-bg{position:absolute;inset:0 0;height:5px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.1);border-radius:3px}
+#sk-fill{position:absolute;left:0;height:5px;top:50%;transform:translateY(-50%);background:var(--ag);border-radius:3px;width:0%;transition:width .12s linear}
+#sk-dot{position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:50%;transform:translate(-50%,-50%);left:0%;pointer-events:none;box-shadow:0 0 12px var(--a);opacity:0;transition:opacity .15s}
+#sk-wrap:hover #sk-dot,#sk-wrap:active #sk-dot{opacity:1}
+#sk-inp{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer;height:100%}
+#times{display:flex;justify-content:space-between;font-size:11px;color:var(--t3);font-variant-numeric:tabular-nums;letter-spacing:.3px;margin-top:2px;font-weight:600}
+
+/* ── VOLUME トグル式 ── */
+#vol{display:flex;align-items:center;gap:10px;width:100%;margin:6px 0}
+#volic{font-size:18px;cursor:pointer;min-width:28px;text-align:center;transition:transform .1s;flex-shrink:0}
+#volic:active{transform:scale(.85)}
+#vol-bar-wrap{flex:1;overflow:hidden;max-height:0;transition:max-height .3s cubic-bezier(.4,0,.2,1),opacity .3s;opacity:0}
+#vol-bar-wrap.open{max-height:40px;opacity:1}
+#volinp{width:100%;accent-color:var(--a);cursor:pointer;display:block}
+
+/* ── VER BADGE (メイン画面) ── */
+#app-ver{position:absolute;bottom:6px;right:10px;font-size:8px;color:var(--t3);opacity:.4;pointer-events:none;z-index:1;letter-spacing:.3px;font-weight:600}
+
+/* account in settings */
+.acct-row{display:flex;align-items:center;padding:14px 16px;gap:12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.acct-avatar{width:36px;height:36px;border-radius:50%;background:var(--ag);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0}
 </style>
 </head>
 <body>
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div id="login-screen">
+  <div id="login-logo">MusicFlow</div>
+  <div id="login-sub">β-1.0 — あなただけの音楽体験</div>
+  <div id="login-card">
+    <div>
+      <div class="lin-lbl">ユーザーID</div>
+      <input class="lin-inp" id="lin-id" type="text" placeholder="ID を入力" autocomplete="username" autocapitalize="none" spellcheck="false">
+    </div>
+    <div>
+      <div class="lin-lbl">パスワード</div>
+      <input class="lin-inp" id="lin-pw" type="password" placeholder="パスワードを入力" autocomplete="current-password">
+    </div>
+    <div id="login-err"></div>
+    <button id="login-btn" onclick="doLogin()">ログイン / 新規登録</button>
+    <div id="login-hint">初めての場合は<strong>新規登録</strong>されます<br>IDとパスワードをメモしておいてください</div>
+  </div>
+  <div id="ver-badge">MusicFlow β-1.0</div>
+</div>
+
+<!-- ═══ TUTORIAL ═══ -->
+<div id="tut">
+  <div id="tut-box">
+    <div id="tut-header"><h2>🎵 MusicFlowへようこそ</h2><p>はじめに使い方を確認しましょう</p></div>
+    <div id="tut-slides">
+      <div class="tut-slide on">
+        <div class="tut-icon">📁</div>
+        <h3>曲を追加する</h3>
+        <p>Libraryタブを開いて音楽ファイルを追加しましょう。</p>
+        <ul>
+          <li>「曲を追加」ボタンをタップしてファイルを選択</li>
+          <li>ドラッグ＆ドロップでもOK（PC）</li>
+          <li>曲は<strong>ブラウザに保存</strong>されるのでタブを閉じても消えません</li>
+        </ul>
+      </div>
+      <div class="tut-slide">
+        <div class="tut-icon">▶️</div>
+        <h3>再生する</h3>
+        <p>曲名をタップするとすぐ再生が始まります。</p>
+        <ul>
+          <li>Nowタブで再生コントロール全体を確認</li>
+          <li>シャッフル・リピート・ランダム再生に対応</li>
+          <li>倍速再生・EQでサウンドをカスタマイズ</li>
+        </ul>
+      </div>
+      <div class="tut-slide">
+        <div class="tut-icon">📱</div>
+        <h3>バックグラウンド再生</h3>
+        <p>他のアプリを使いながら音楽を聴き続けられます。</p>
+        <ul>
+          <li>ロック画面・通知センターで操作可能</li>
+          <li>イヤホンボタンで再生/停止・曲送り</li>
+          <li>iOSはSafariで開いたまま使用してください</li>
+        </ul>
+      </div>
+      <div class="tut-slide">
+        <div class="tut-icon">🎵</div>
+        <h3>プレイリスト</h3>
+        <p>曲をまとめてプレイリストに整理できます。</p>
+        <ul>
+          <li>曲を長押し（⋮ボタン）→「プレイリストに追加」</li>
+          <li>お気に入り・最近追加など自動リストも便利</li>
+          <li>歌詞の登録・タグ編集・ジャケット変更もできます</li>
+        </ul>
+      </div>
+      <div class="tut-slide">
+        <div class="tut-icon">✅</div>
+        <h3>準備完了！</h3>
+        <p>MusicFlowをお楽しみください。<br>設定画面からいつでもこのチュートリアルを見返せます。</p>
+        <ul>
+          <li>テーマカラー・ダークモードは設定から変更</li>
+          <li>スリープタイマーで就寝時も安心</li>
+          <li>ご意見・バグはフィードバックまで</li>
+        </ul>
+      </div>
+    </div>
+    <div id="tut-dots"></div>
+    <div id="tut-footer">
+      <button id="tut-prev" onclick="tutStep(-1)">戻る</button>
+      <button id="tut-next" onclick="tutStep(1)">次へ</button>
+    </div>
+  </div>
+</div>
+
 <div id="lbar"></div>
 <div id="bgart"></div>
 <div id="dbstatus"></div>
@@ -348,8 +500,8 @@ body.light{--bg:#f0f0f8;--s1:#fff;--s2:#f4f4fb;--s3:#eaeaf5;--s4:#dcdcee;--t:#14
       <div id="times"><span id="tc">0:00</span><span id="tr">-0:00</span></div>
     </div>
     <div id="vol">
-      <div id="volic" onclick="toggleMute()">🔊</div>
-      <input id="volinp" type="range" min="0" max="100" value="80">
+      <div id="volic" onclick="togVolBar()">🔊</div>
+      <div id="vol-bar-wrap"><input id="volinp" type="range" min="0" max="100" value="80"></div>
     </div>
     <div id="ctrls">
       <button class="cb" id="bshuf" onclick="togShuf()" title="シャッフル">
@@ -460,7 +612,22 @@ body.light{--bg:#f0f0f8;--s1:#fff;--s2:#f4f4fb;--s3:#eaeaf5;--s4:#dcdcee;--t:#14
   <div class="seth">データ (IndexedDB)</div>
   <div class="setr"><div class="setic" style="background:linear-gradient(135deg,#44aaff,#66ccff)"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div><div class="setl">ストレージ使用量<div class="setsb" id="dbsize">計算中...</div></div></div>
   <div class="setr" style="cursor:pointer" onclick="clearAll()"><div class="setic" style="background:linear-gradient(135deg,#ff4444,#ff6666)"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></div><div class="setl">ライブラリをクリア<div class="setsb" style="color:var(--red)">すべての曲・IndexedDBデータを削除</div></div></div>
-  <div class="setr"><div class="setic" style="background:var(--s3)"><svg viewBox="0 0 24 24" stroke="var(--t3)" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="setl">MusicFlow v3.0<div class="setsb">IndexedDB対応 — タブを閉じても曲が消えません</div></div></div>
+  <div class="seth">アカウント</div>
+  <div class="acct-row" id="acct-row">
+    <div class="acct-avatar" id="acct-avatar">?</div>
+    <div class="setl"><span id="acct-name">—</span><div class="setsb" id="acct-sub">ログイン中</div></div>
+    <button style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);color:var(--t2);padding:7px 14px;border-radius:10px;font-size:12px;cursor:pointer;font-weight:700" onclick="doLogout()">ログアウト</button>
+  </div>
+  <div class="seth">ヘルプ</div>
+  <div class="setr" style="cursor:pointer" onclick="openTut()">
+    <div class="setic" style="background:linear-gradient(135deg,#7c5cfc,#c471ed)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+    <div class="setl">チュートリアルを見る<div class="setsb">使い方ガイドを最初から確認</div></div>
+    <div style="color:var(--t3);font-size:18px;opacity:.4">›</div>
+  </div>
+  <div class="seth">データ (IndexedDB)</div>
+  <div class="setr"><div class="setic" style="background:linear-gradient(135deg,#44aaff,#66ccff)"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div><div class="setl">ストレージ使用量<div class="setsb" id="dbsize">計算中...</div></div></div>
+  <div class="setr" style="cursor:pointer" onclick="clearAll()"><div class="setic" style="background:linear-gradient(135deg,#ff4444,#ff6666)"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></div><div class="setl">ライブラリをクリア<div class="setsb" style="color:var(--red)">すべての曲・IndexedDBデータを削除</div></div></div>
+  <div class="setr"><div class="setic" style="background:var(--s3)"><svg viewBox="0 0 24 24" stroke="var(--t3)" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="setl">MusicFlow<div class="setsb" id="ver-sett" style="color:var(--a2);font-weight:700">β-1.0</div></div></div>
 </div>
 
 <!-- ─── BOTTOM NAV ─── -->
@@ -852,7 +1019,8 @@ async function playTrack(idx,keepQ=false){
   if(gainN) gainN.gain.value = cfg.vol/100;
   // iOS: gainN なし → aud.volume のみで制御
   aud.playbackRate = SPEEDS[speedIdx];
-  if(t.lastPos>5&&t.lastPos<(t.dur||Infinity)-5)aud.currentTime=t.lastPos;
+  // 常に最初から再生（lastPos は保存するが再生開始位置には使わない）
+  aud.currentTime = 0;
   try{
     // iOS Safari: play() は必ずユーザー操作の同期コンテキストから呼ぶ必要がある
     // ここは async だが UI タップから呼ばれるので基本OK
@@ -910,7 +1078,29 @@ function buildQ(){
 function setupSeek(){document.getElementById('sk-inp').addEventListener('input',e=>{if(aud.duration)aud.currentTime=aud.duration*e.target.value/10000;});}
 function setupVol(){
   const sl=document.getElementById('volinp');
-  sl.addEventListener('input',()=>{cfg.vol=+sl.value;aud.volume=cfg.vol/100;if(gainN)gainN.gain.value=cfg.vol/100;syncVolIc();saveCfg();});
+  // ── 音量バグ修正 ──
+  // 'change' ではなく 'input' を使う（スライド中もリアルタイム反映）
+  // aud.volume を必ずセット → gainN は補助（iOS では null）
+  sl.addEventListener('input',function(){
+    const v=+this.value;
+    cfg.vol=v;
+    aud.volume=v/100;          // HTMLAudioElement に直接セット（確実）
+    if(gainN) gainN.gain.value=v/100; // WebAudio gain（Android/PC）
+    syncVolIc();
+    saveCfg();
+  });
+}
+function togVolBar(){
+  // アイコンタップで音量バーをトグル表示
+  const wrap=document.getElementById('vol-bar-wrap');
+  const isOpen=wrap.classList.contains('open');
+  if(isOpen){
+    // バーを閉じる → ミュートトグル
+    wrap.classList.remove('open');
+    toggleMute();
+  } else {
+    wrap.classList.add('open');
+  }
 }
 function onTime(){
   if(!aud.duration)return;
@@ -1339,8 +1529,145 @@ function showLoad(on){const b=document.getElementById('lbar');if(on){b.style.wid
 
 document.addEventListener('click',()=>closeCtx());
 
+// ═══ ACCOUNT ═══
+const USERS_KEY='mf_users';   // {id: hashedPw}
+const SESSION_KEY='mf_sess';  // {id, loggedIn}
+
+// 簡易ハッシュ（本番用途ではなくローカル保存用）
+async function hashPw(pw){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw+'mf_salt'));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function loadUsers(){try{return JSON.parse(localStorage.getItem(USERS_KEY)||'{}');}catch(e){return{};}}
+function saveUsers(u){localStorage.setItem(USERS_KEY,JSON.stringify(u));}
+function loadSession(){try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(e){return null;}}
+function saveSession(s){localStorage.setItem(SESSION_KEY,JSON.stringify(s));}
+
+async function doLogin(){
+  const id=document.getElementById('lin-id').value.trim();
+  const pw=document.getElementById('lin-pw').value;
+  const err=document.getElementById('login-err');
+  err.textContent='';
+  if(!id){err.textContent='IDを入力してください';return;}
+  if(pw.length<4){err.textContent='パスワードは4文字以上にしてください';return;}
+  if(!/^[a-zA-Z0-9_\-\.]+$/.test(id)){err.textContent='IDは英数字・_・-・. のみ使えます';return;}
+  const hpw=await hashPw(pw);
+  const users=loadUsers();
+  const isNew=!users[id];
+  if(!isNew && users[id]!==hpw){err.textContent='パスワードが違います';return;}
+  if(isNew){users[id]=hpw;saveUsers(users);}
+  saveSession({id,loggedIn:Date.now()});
+  document.getElementById('login-screen').classList.add('hide');
+  syncAcctUI(id);
+  if(isNew){
+    // 初回登録 → チュートリアル
+    openTut();
+  }
+}
+
+function doLogout(){
+  if(!confirm('ログアウトしますか？'))return;
+  localStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function syncAcctUI(id){
+  const av=document.getElementById('acct-avatar');
+  const nm=document.getElementById('acct-name');
+  const sb=document.getElementById('acct-sub');
+  if(av)av.textContent=id[0].toUpperCase();
+  if(nm)nm.textContent=id;
+  if(sb)sb.textContent='ログイン中 (@'+id+')';
+}
+
+function checkSession(){
+  const sess=loadSession();
+  if(sess&&sess.id){
+    document.getElementById('login-screen').classList.add('hide');
+    syncAcctUI(sess.id);
+    return true;
+  }
+  return false;
+}
+
+// Enterキーでログイン
+document.getElementById('lin-pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('lin-id').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lin-pw').focus();});
+
+// ═══ TUTORIAL ═══
+let tutIdx=0;
+const TUT_TOTAL=5;
+
+function buildTutDots(){
+  const dots=document.getElementById('tut-dots');
+  dots.innerHTML='';
+  for(let i=0;i<TUT_TOTAL;i++){
+    const d=document.createElement('div');
+    d.className='tut-dot'+(i===0?' on':'');
+    dots.appendChild(d);
+  }
+}
+
+function tutStep(dir){
+  const slides=document.querySelectorAll('.tut-slide');
+  const dots=document.querySelectorAll('.tut-dot');
+  slides[tutIdx].classList.remove('on');
+  dots[tutIdx].classList.remove('on');
+  tutIdx=Math.max(0,Math.min(TUT_TOTAL-1,tutIdx+dir));
+  slides[tutIdx].classList.add('on');
+  dots[tutIdx].classList.add('on');
+  const prev=document.getElementById('tut-prev');
+  const next=document.getElementById('tut-next');
+  prev.style.opacity=tutIdx===0?'0.3':'1';
+  prev.style.pointerEvents=tutIdx===0?'none':'auto';
+  if(tutIdx===TUT_TOTAL-1){next.textContent='はじめる ✓';}
+  else{next.textContent='次へ';}
+  if(tutIdx===TUT_TOTAL-1&&dir>0){closeTut();}
+}
+
+function openTut(){
+  tutIdx=0;
+  document.querySelectorAll('.tut-slide').forEach((s,i)=>s.classList.toggle('on',i===0));
+  document.querySelectorAll('.tut-dot').forEach((d,i)=>d.classList.toggle('on',i===0));
+  document.getElementById('tut-prev').style.opacity='0.3';
+  document.getElementById('tut-prev').style.pointerEvents='none';
+  document.getElementById('tut-next').textContent='次へ';
+  document.getElementById('tut').classList.add('on');
+}
+function closeTut(){document.getElementById('tut').classList.remove('on');}
+
 // ═══ START ═══
-boot();
+buildTutDots();
+if(checkSession()){
+  boot(); // セッション有効 → 即起動
+}
+// ※ セッションなし → login-screen が表示されたまま boot は呼ばれない
+
+// doLogin（上の関数定義を上書きして boot も呼ぶ）
+async function doLogin(){
+  const id=document.getElementById('lin-id').value.trim();
+  const pw=document.getElementById('lin-pw').value;
+  const err=document.getElementById('login-err');
+  err.textContent='';
+  if(!id){err.textContent='IDを入力してください';return;}
+  if(pw.length<4){err.textContent='パスワードは4文字以上にしてください';return;}
+  if(!/^[a-zA-Z0-9_\-\.]+$/.test(id)){err.textContent='IDは英数字・_・-・. のみ使えます';return;}
+  const hpw=await hashPw(pw);
+  const users=loadUsers();
+  const isNew=!users[id];
+  if(!isNew && users[id]!==hpw){err.textContent='パスワードが違います';return;}
+  if(isNew){users[id]=hpw;saveUsers(users);}
+  saveSession({id,loggedIn:Date.now()});
+  const loginEl=document.getElementById('login-screen');
+  loginEl.style.transition='opacity .4s';
+  loginEl.style.opacity='0';
+  setTimeout(()=>{loginEl.classList.add('hide');loginEl.style.opacity='';},400);
+  syncAcctUI(id);
+  // 初回ならboot後にチュートリアル
+  await boot();
+  if(isNew) setTimeout(()=>openTut(),600);
+}
 </script>
 </body>
 </html>
