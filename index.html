@@ -771,46 +771,20 @@ async function loadFromDB(){
   if(cRec) Object.assign(cfg,cRec.value||{});
 }
 
-// ── iOS バックグラウンド再生対応 ──────────────────────────────
-// iOS Safari は blob: URL をバックグラウンドで停止する。
-// 対策: ArrayBuffer → base64 data URI に変換してキャッシュ。
-// data URI は iOS バックグラウンドでも再生が継続される。
-const urlCache = {}; // id -> data URI (メモリキャッシュ)
-
-function ab2dataURL(ab, mime) {
-  // ArrayBuffer → Uint8Array → binary string → base64
-  const bytes = new Uint8Array(ab);
-  let bin = '';
-  // チャンク処理（スタックオーバーフロー防止）
-  const CHUNK = 8192;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return 'data:' + (mime || 'audio/mpeg') + ';base64,' + btoa(bin);
-}
+// ── 音声URL管理 ──────────────────────────────────────────────
+// blob URL をセッション中キャッシュする（毎回IDBから読まない）
+const urlCache = {}; // id -> blob URL
 
 async function getAudioURL(t) {
-  // キャッシュがあればそのまま返す
+  // キャッシュ済みの blob URL が有効か確認
   if (urlCache[t.id]) return urlCache[t.id];
 
   const ab = await getFileFromDB(t.id);
   if (!ab) return null;
 
   const mime = t.mime || 'audio/mpeg';
-
-  // ファイルサイズで方式を選択
-  // 小さいファイル(<= 30MB): data URI（iOS バックグラウンド安定）
-  // 大きいファイル(> 30MB) : blob URL（メモリ節約。バックグラウンドは△）
-  const MB30 = 30 * 1024 * 1024;
-  let url;
-  if (ab.byteLength <= MB30) {
-    url = ab2dataURL(ab, mime);
-  } else {
-    // 大きいファイルは blob URL を使うが、iOS BG は止まる可能性あり
-    const blob = new Blob([ab], { type: mime });
-    url = URL.createObjectURL(blob);
-  }
-
+  const blob = new Blob([ab], { type: mime });
+  const url = URL.createObjectURL(blob);
   urlCache[t.id] = url;
   return url;
 }
@@ -1053,6 +1027,8 @@ async function playTrack(idx, keepQ=false){
 
   // 既存の再生を止めてソースを差し替え
   aud.pause();
+  aud.src = '';      // 一度リセット（iOS で前の曲が残るのを防ぐ）
+  aud.load();
   aud.src = url;
   aud.volume = cfg.vol / 100;
   if(gainN) gainN.gain.value = cfg.vol / 100;
@@ -1283,7 +1259,7 @@ async function removeTrk(idx){
   const t=lib.splice(idx,1)[0];
   // キャッシュ解放（blob URLの場合のみ revoke、data URI はそのまま delete）
   if(urlCache[t.id]){
-    if(urlCache[t.id].startsWith('blob:')) URL.revokeObjectURL(urlCache[t.id]);
+    URL.revokeObjectURL(urlCache[t.id]);
     delete urlCache[t.id];
   }
   await delFileFromDB(t.id);
@@ -1391,7 +1367,7 @@ async function clearAll(){
   if(!confirm('ライブラリをすべて削除しますか？\nIndexedDBの音楽データもすべて消えます。'))return;
   aud.pause();aud.src='';
   // urlCache のうち blob: URL だけ revoke してメモリ解放
-  Object.entries(urlCache).forEach(([k,u])=>{if(u.startsWith('blob:'))URL.revokeObjectURL(u);});
+  Object.values(urlCache).forEach(u=>URL.revokeObjectURL(u));
   Object.keys(urlCache).forEach(k=>delete urlCache[k]);
   lib=[];playlists=[];hist=[];curIdx=-1;
   await idbClear(STORE_FILES);await idbClear(STORE_META);
