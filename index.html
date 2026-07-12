@@ -1034,31 +1034,39 @@ function getDur(url){return new Promise(res=>{const a=new Audio();a.preload='met
 function onDrop(e){e.preventDefault();document.getElementById('dz').classList.remove('drag');addFiles(e.dataTransfer.files);}
 
 // ═══ PLAY ═══
-// 再生中のリクエストIDで競合を防ぐ
-let _playReqId = 0;
+// 再生中フラグ（二重呼び出し防止）
+let _isLoading = false;
 
 async function playTrack(idx, keepQ=false){
   if(idx < 0 || idx >= lib.length) return;
 
-  // ── このリクエストのID（後から来たタップで上書き検知）
-  const reqId = ++_playReqId;
+  // ロード中に連打された場合は最新のものだけ処理
+  // curIdx を即座に更新して「どの曲を再生するか」を確定
+  curIdx = idx;
+
+  if(_isLoading) return; // 既にロード中なら待たずにスキップ
+  _isLoading = true;
 
   if(!actx) initWA();
   if(actx?.state === 'suspended') actx.resume();
 
-  const t = lib[idx];
+  const t = lib[curIdx]; // ← 最新の curIdx を使う
 
-  // ── UI を即座に更新（タップした瞬間に反映）
-  curIdx = idx;
+  // ── UI を即座に更新
   syncNP(t);
   syncMini(t);
-  renderLib();   // 選択行のハイライトを即更新
+  renderLib();
 
-  // ── URL取得（IndexedDB → data URI 変換、時間がかかる）
+  // ── URL取得（IndexedDB → data URI 変換）
   const url = await getAudioURL(t);
+  _isLoading = false;
 
-  // ── 待機中に別の曲がタップされたら中止
-  if(reqId !== _playReqId) return;
+  // ロード完了後に curIdx が変わっていたら（連打で別曲が選ばれた場合）
+  // その曲で再度呼び直す
+  if(curIdx !== idx){
+    playTrack(curIdx, keepQ);
+    return;
+  }
 
   if(!url){ toast('⚠ ファイルが見つかりません（再追加してください）'); return; }
 
@@ -1079,26 +1087,18 @@ async function playTrack(idx, keepQ=false){
     const p = aud.play();
     if(p !== undefined) await p;
 
-    // play() 完了後も別リクエストで上書きされていたら統計だけスキップ
-    if(reqId !== _playReqId) return;
-
     t.plays = (t.plays || 0) + 1;
     t.lastPlayed = Date.now();
     hist.unshift(idx);
     if(hist.length > 200) hist = hist.slice(0, 200);
 
-    // UI は既に更新済みだが renderPLs・Stats はここで
     renderPLs(); renderStats();
     updateMS();
     if(!keepQ) buildQ();
-    saveMetaToDB(); // await しない（UIをブロックしない）
-    // Now タブへ遷移（mini は goTab 内で非表示になる）
-    document.getElementById('mini').classList.remove('on'); // 先に非表示
+    saveMetaToDB();
+    document.getElementById('mini').classList.remove('on');
     goTab('sp');
-    // Library 画面のハイライトを再確定（goTab で画面が切り替わった後）
     renderLib();
-
-    // 波形アニメが止まっている場合に再起動
     if(!_waveRunning) waveLoop();
 
   }catch(err){
