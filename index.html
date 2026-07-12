@@ -848,6 +848,8 @@ async function boot(){
   setupVis();
   setupWL();
   calcDBSize();
+  // 波形アニメを即起動（WebAudio 接続前でも動く）
+  waveLoop();
   showLoad(false);
 }
 
@@ -921,11 +923,39 @@ function buildWave(){
   const el=document.getElementById('wave');el.innerHTML='';
   for(let i=0;i<40;i++){const b=document.createElement('div');b.className='wb';b.style.height=(Math.random()*14+4)+'px';el.appendChild(b);}
 }
+let _waveRunning = false;
 function waveLoop(){
-  if(!anlN)return;
-  const bars=document.querySelectorAll('.wb');
-  const buf=new Uint8Array(anlN.frequencyBinCount);
-  (function tick(){requestAnimationFrame(tick);anlN.getByteFrequencyData(buf);bars.forEach((b,i)=>{const v=buf[Math.floor(i*buf.length/bars.length)]||0;b.style.height=(isPlay?Math.max(3,v/3.2):Math.random()*5+2)+'px';b.classList.toggle('hot',isPlay&&v>20);});})();
+  if(_waveRunning) return; // 二重起動防止
+  _waveRunning = true;
+  const bars = document.querySelectorAll('.wb');
+  const buf = anlN ? new Uint8Array(anlN.frequencyBinCount) : null;
+  (function tick(){
+    requestAnimationFrame(tick);
+    if(isPlay){
+      if(anlN && buf){
+        anlN.getByteFrequencyData(buf);
+        bars.forEach((b,i)=>{
+          const v = buf[Math.floor(i * buf.length / bars.length)] || 0;
+          // iOS: anlN がソースに未接続だと v=0 になる → フォールバック
+          const h = v > 0
+            ? Math.max(3, v / 3.2)
+            : (Math.sin(Date.now()*0.003 + i*0.4)*8 + 10); // アニメフォールバック
+          b.style.height = h + 'px';
+          b.classList.toggle('hot', v > 20 || (v === 0 && isPlay));
+        });
+      } else {
+        // WebAudio なし → 再生中はランダムアニメ
+        bars.forEach((b,i)=>{
+          const h = Math.sin(Date.now()*0.004 + i*0.5)*10 + 12;
+          b.style.height = h + 'px';
+          b.classList.add('hot');
+        });
+      }
+    } else {
+      // 停止中 → 静止
+      bars.forEach(b=>{ b.style.height='3px'; b.classList.remove('hot'); });
+    }
+  })();
 }
 
 // ═══ ADD FILES ═══
@@ -997,49 +1027,75 @@ function getDur(url){return new Promise(res=>{const a=new Audio();a.preload='met
 function onDrop(e){e.preventDefault();document.getElementById('dz').classList.remove('drag');addFiles(e.dataTransfer.files);}
 
 // ═══ PLAY ═══
-async function playTrack(idx,keepQ=false){
-  if(idx<0||idx>=lib.length)return;
-  // WebAudio は再生ボタン押下（ユーザー操作）から初期化
-  if(!actx)initWA();
-  if(actx?.state==='suspended')actx.resume();
-  curIdx=idx; const t=lib[idx];
-  const url=await getAudioURL(t);
-  if(!url){toast('⚠ ファイルが見つかりません（再追加してください）');return;}
+// 再生中のリクエストIDで競合を防ぐ
+let _playReqId = 0;
+
+async function playTrack(idx, keepQ=false){
+  if(idx < 0 || idx >= lib.length) return;
+
+  // ── このリクエストのID（後から来たタップで上書き検知）
+  const reqId = ++_playReqId;
+
+  if(!actx) initWA();
+  if(actx?.state === 'suspended') actx.resume();
+
+  const t = lib[idx];
+
+  // ── UI を即座に更新（タップした瞬間に反映）
+  curIdx = idx;
+  syncNP(t);
+  syncMini(t);
+  renderLib();   // 選択行のハイライトを即更新
+
+  // ── URL取得（IndexedDB → data URI 変換、時間がかかる）
+  const url = await getAudioURL(t);
+
+  // ── 待機中に別の曲がタップされたら中止
+  if(reqId !== _playReqId) return;
+
+  if(!url){ toast('⚠ ファイルが見つかりません（再追加してください）'); return; }
+
   aud.pause();
-  // data URI の場合は src を直接セット（load()不要、iOS BGに強い）
-  // blob URL の場合は一度リセットして load() を呼ぶ
-  if (url.startsWith('data:')) {
+  if(url.startsWith('data:')){
     aud.src = url;
   } else {
     aud.src = '';
     aud.load();
     aud.src = url;
   }
-  aud.volume = cfg.vol/100;
-  if(gainN) gainN.gain.value = cfg.vol/100;
-  // iOS: gainN なし → aud.volume のみで制御
+  aud.volume = cfg.vol / 100;
+  if(gainN) gainN.gain.value = cfg.vol / 100;
   aud.playbackRate = SPEEDS[speedIdx];
-  // 常に最初から再生（lastPos は保存するが再生開始位置には使わない）
   aud.currentTime = 0;
+
   try{
-    // iOS Safari: play() は必ずユーザー操作の同期コンテキストから呼ぶ必要がある
-    // ここは async だが UI タップから呼ばれるので基本OK
-    const playPromise=aud.play();
-    if(playPromise!==undefined)await playPromise;
-    t.plays=(t.plays||0)+1; t.lastPlayed=Date.now();
-    hist.unshift(idx); if(hist.length>200)hist=hist.slice(0,200);
-    syncNP(t); syncMini(t); renderLib(); renderPLs(); renderStats();
-    updateMS(); // ロック画面・通知センターの曲情報を更新
-    if(!keepQ)buildQ();
-    await saveMetaToDB();
+    const p = aud.play();
+    if(p !== undefined) await p;
+
+    // play() 完了後も別リクエストで上書きされていたら統計だけスキップ
+    if(reqId !== _playReqId) return;
+
+    t.plays = (t.plays || 0) + 1;
+    t.lastPlayed = Date.now();
+    hist.unshift(idx);
+    if(hist.length > 200) hist = hist.slice(0, 200);
+
+    // UI は既に更新済みだが renderPLs・Stats はここで
+    renderPLs(); renderStats();
+    updateMS();
+    if(!keepQ) buildQ();
+    saveMetaToDB(); // await しない（UIをブロックしない）
     goTab('sp');
+
+    // 波形アニメが止まっている場合に再起動
+    if(anlN && !_waveRunning) waveLoop();
+
   }catch(err){
-    console.error('playTrack error:',err);
-    // iOS: NotAllowedError はユーザー操作コンテキスト外。再度タップを促す
-    if(err.name==='NotAllowedError'){
+    console.error('playTrack error:', err);
+    if(err.name === 'NotAllowedError'){
       toast('▶ 再度再生ボタンをタップしてください');
     } else {
-      toast('再生エラー: '+(err.message||err));
+      toast('再生エラー: ' + (err.message || err));
     }
   }
 }
@@ -1341,9 +1397,20 @@ function goTab(id){
   document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
   document.querySelector(`.nt[data-t="${id}"]`)?.classList.add('on');
   document.getElementById(id)?.classList.add('on');
-  const t=curIdx>=0?lib[curIdx]:null;
-  document.getElementById('mini').classList.toggle('on',id!=='sp'&&!!t);
-  if(id==='sst')renderStats();if(id==='spl')renderPLs();
+  // mini player: sp以外のタブで、かつ曲が選択されている場合に表示
+  const hasTrk = curIdx >= 0 && curIdx < lib.length;
+  document.getElementById('mini').classList.toggle('on', id !== 'sp' && hasTrk);
+  // mini の情報を現在の曲で更新
+  if(hasTrk){
+    const t = lib[curIdx];
+    document.getElementById('mit').textContent  = t?.title  || '—';
+    document.getElementById('miar').textContent = t?.artist || '—';
+    const mi=document.getElementById('miimg'), mic=document.getElementById('miic');
+    if(t?.cover){mi.src=t.cover;mi.style.display='block';mic.style.display='none';}
+    else{mi.style.display='none';mic.style.display='block';}
+  }
+  if(id==='sst')renderStats();
+  if(id==='spl')renderPLs();
 }
 
 // ═══ KEYS ═══
