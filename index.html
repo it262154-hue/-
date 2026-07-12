@@ -1034,77 +1034,49 @@ function getDur(url){return new Promise(res=>{const a=new Audio();a.preload='met
 function onDrop(e){e.preventDefault();document.getElementById('dz').classList.remove('drag');addFiles(e.dataTransfer.files);}
 
 // ═══ PLAY ═══
-// 再生中フラグ（二重呼び出し防止）
-let _isLoading = false;
-
 async function playTrack(idx, keepQ=false){
   if(idx < 0 || idx >= lib.length) return;
 
-  // ロード中に連打された場合は最新のものだけ処理
-  // curIdx を即座に更新して「どの曲を再生するか」を確定
   curIdx = idx;
-
-  if(_isLoading) return; // 既にロード中なら待たずにスキップ
-  _isLoading = true;
+  const t = lib[idx];
 
   if(!actx) initWA();
   if(actx?.state === 'suspended') actx.resume();
 
-  const t = lib[curIdx]; // ← 最新の curIdx を使う
-
-  // ── UI を即座に更新
+  // UI即時更新（ジャケット・曲名・ライブラリハイライト）
   syncNP(t);
-  syncMini(t);
   renderLib();
 
-  // ── URL取得（IndexedDB → data URI 変換）
+  // URL取得（キャッシュ済みなら一瞬、初回はIDB変換で数百ms）
   const url = await getAudioURL(t);
-  _isLoading = false;
-
-  // ロード完了後に curIdx が変わっていたら（連打で別曲が選ばれた場合）
-  // その曲で再度呼び直す
-  if(curIdx !== idx){
-    playTrack(curIdx, keepQ);
-    return;
-  }
-
   if(!url){ toast('⚠ ファイルが見つかりません（再追加してください）'); return; }
 
+  // 既存の再生を止めてソースを差し替え
   aud.pause();
-  if(url.startsWith('data:')){
-    aud.src = url;
-  } else {
-    aud.src = '';
-    aud.load();
-    aud.src = url;
-  }
+  aud.src = url;
   aud.volume = cfg.vol / 100;
   if(gainN) gainN.gain.value = cfg.vol / 100;
   aud.playbackRate = SPEEDS[speedIdx];
   aud.currentTime = 0;
 
   try{
-    const p = aud.play();
-    if(p !== undefined) await p;
-
+    await aud.play();
+    // 再生成功後の処理
     t.plays = (t.plays || 0) + 1;
     t.lastPlayed = Date.now();
     hist.unshift(idx);
     if(hist.length > 200) hist = hist.slice(0, 200);
-
-    renderPLs(); renderStats();
+    renderPLs(); renderStats(); renderLib();
     updateMS();
     if(!keepQ) buildQ();
     saveMetaToDB();
     document.getElementById('mini').classList.remove('on');
     goTab('sp');
-    renderLib();
     if(!_waveRunning) waveLoop();
-
   }catch(err){
     console.error('playTrack error:', err);
     if(err.name === 'NotAllowedError'){
-      toast('▶ 再度再生ボタンをタップしてください');
+      toast('▶ 再度タップしてください');
     } else {
       toast('再生エラー: ' + (err.message || err));
     }
